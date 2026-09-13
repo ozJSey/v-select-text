@@ -1,10 +1,10 @@
-### [@ozjsey/v-select-text](https://www.npmjs.com/package/@ozjsey/v-select-text)
+# v-select-text
 
 ## Select the rendered text of any element — whole, by range, or by pattern
 
 Selecting an `<input>` is one line of vanilla JS (`el.select()`) and needs no directive. Selecting the *rendered text* of a `<p>`, a `<blockquote>`, a `<td>` or a `<code>` block — across nested markup, at offsets that survive template indentation, or by a pattern you only know at runtime — is the thing that actually needs one.
 
-`@ozjsey/v-select-text` does that with the Range API, and supports inputs, textareas and contenteditable hosts on the same options bag.
+`v-select-text` does that with the Range API, and supports inputs, textareas and contenteditable hosts on the same options bag.
 
 ## Features
 
@@ -22,7 +22,7 @@ Selecting an `<input>` is one line of vanilla JS (`el.select()`) and needs no di
 ## Install
 
 ```bash
-npm install @ozjsey/v-select-text
+npm install v-select-text
 ```
 
 Vue 3 is a peer dependency — it won't be bundled.
@@ -33,7 +33,7 @@ Vue 3 is a peer dependency — it won't be bundled.
 
 ```ts
 import { createApp } from 'vue'
-import { SelectTextPlugin } from '@ozjsey/v-select-text'
+import { SelectTextPlugin } from 'v-select-text'
 import App from './App.vue'
 
 createApp(App).use(SelectTextPlugin).mount('#app')
@@ -45,7 +45,7 @@ This registers the directive under the kebab-case name `select-text`, so templat
 
 ```ts
 import { createApp } from 'vue'
-import { vSelectText } from '@ozjsey/v-select-text'
+import { vSelectText } from 'v-select-text'
 import App from './App.vue'
 
 createApp(App).directive('select-text', vSelectText).mount('#app')
@@ -55,7 +55,7 @@ createApp(App).directive('select-text', vSelectText).mount('#app')
 
 ```vue
 <script setup lang="ts">
-import { vSelectText } from '@ozjsey/v-select-text'
+import { vSelectText } from 'v-select-text'
 </script>
 
 <template>
@@ -118,7 +118,7 @@ const enabled = ref(true)
 ### Click to select
 
 ```vue
-<code v-select-text="{ trigger: 'click' }">npm install @ozjsey/v-select-text</code>
+<code v-select-text="{ trigger: 'click' }">npm install v-select-text</code>
 ```
 
 `trigger: 'click'` never fires on mount or update — only on a click of the host. Unlike
@@ -141,7 +141,7 @@ where there is none. See [Copying the selection](#copying-the-selection).
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { SelectTextOptions } from '@ozjsey/v-select-text'
+import type { SelectTextOptions } from 'v-select-text'
 
 const isEditing = ref(false)
 const options = ref<SelectTextOptions>({
@@ -195,7 +195,7 @@ contenteditable hosts take the Range path, so everything in the text sections ap
 The directive accepts `boolean | SelectTextOptions | undefined`:
 
 ```ts
-import type { SelectTextOptions } from '@ozjsey/v-select-text'
+import type { SelectTextOptions } from 'v-select-text'
 
 type SelectTextOptions = {
   enabled?: boolean                              // default: true
@@ -319,7 +319,7 @@ type SelectTextEventDetail = {
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { SelectTextEventDetail } from '@ozjsey/v-select-text'
+import type { SelectTextEventDetail } from 'v-select-text'
 
 const copied = ref('')
 
@@ -624,7 +624,7 @@ The imperative form, for when the element is held outside a template or the sele
 ```vue
 <script setup lang="ts">
 import { useTemplateRef } from 'vue'
-import { useSelectText } from '@ozjsey/v-select-text'
+import { useSelectText } from 'v-select-text'
 
 const quoteRef = useTemplateRef<HTMLElement>('quote')
 const selection = useSelectText({

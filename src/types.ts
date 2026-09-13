@@ -135,7 +135,7 @@ export type SelectTextOptions = {
    *
    * @default false
    * @example
-   *   <code v-select-text="{ trigger: 'click', copy: true }">npm i @ozjsey/v-select-text</code>
+   *   <code v-select-text="{ trigger: 'click', copy: true }">npm i v-select-text</code>
    */
   copy?: boolean
 }
