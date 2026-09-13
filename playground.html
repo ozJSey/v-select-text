@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>v-select-text Playground</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; }
+    h1 { font-size: 1.4rem; margin-bottom: 24px; }
+    h2 { font-size: 1.1rem; margin: 24px 0 12px; }
+    label { display: block; margin-bottom: 6px; font-weight: 500; }
+    input, textarea { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
+    textarea { min-height: 80px; resize: vertical; }
+    button { padding: 8px 16px; border: none; border-radius: 6px; background: #4f46e5; color: #fff; font-size: 0.9rem; cursor: pointer; margin-top: 8px; }
+    button:hover { background: #4338ca; }
+    .section { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    .note { font-size: 0.85rem; color: #6b7280; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>v-select-text Playground</h1>
+
+    <div class="section">
+      <h2>Boolean toggle</h2>
+      <label>Click the button, then click the input to see selection:</label>
+      <input v-select-text="selectAll" value="Hello World" />
+      <button @click="selectAll = !selectAll">
+        Toggle ({{ selectAll }})
+      </button>
+      <p class="note">Selects all text on each false &rarr; true transition.</p>
+    </div>
+
+    <div class="section">
+      <h2>Range selection</h2>
+      <label>Selects characters 0&ndash;5 ("Hello"):</label>
+      <input v-select-text="rangeOpts" value="Hello World" />
+      <button @click="rangeOpts = { ...rangeOpts, condition: !rangeOpts.condition }">
+        Toggle ({{ rangeOpts.condition }})
+      </button>
+      <p class="note">Uses setSelectionRange(0, 5).</p>
+    </div>
+
+    <div class="section">
+      <h2>Textarea support</h2>
+      <label>Works the same way on textareas:</label>
+      <textarea v-select-text="selectTextarea">Multi-line text content goes here.</textarea>
+      <button @click="selectTextarea = !selectTextarea">
+        Toggle ({{ selectTextarea }})
+      </button>
+    </div>
+
+    <div class="section">
+      <h2>Bare directive (always selects on mount)</h2>
+      <input v-select-text value="Selected on mount" />
+      <p class="note">No binding value &mdash; selects immediately on mount.</p>
+    </div>
+  </div>
+
+  <script type="module">
+    // In a real project you'd import from the package:
+    // import { vSelectText } from 'v-select-text'
+    //
+    // For the playground we inline a simplified version:
+    const previousConditionMap = new WeakMap()
+
+    function resolveBinding(value) {
+      if (value === undefined || value === true) return { condition: true }
+      if (value === false) return { condition: false }
+      return { condition: value.condition ?? true, start: value.start, end: value.end, direction: value.direction ?? 'forward' }
+    }
+
+    function isSelectable(el) {
+      return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement
+    }
+
+    function performSelection(el, resolved) {
+      if (resolved.start !== undefined || resolved.end !== undefined) {
+        const s = resolved.start ?? 0
+        const e = resolved.end ?? el.value.length
+        try { el.setSelectionRange(s, e, resolved.direction) } catch { el.select() }
+      } else {
+        el.select()
+      }
+    }
+
+    const vSelectText = {
+      mounted(el, binding) {
+        if (!isSelectable(el)) { console.warn('[v-select-text] Directive only works on <input> and <textarea> elements.'); return }
+        const r = resolveBinding(binding.value)
+        previousConditionMap.set(el, r.condition)
+        if (r.condition) performSelection(el, r)
+      },
+      updated(el, binding) {
+        if (!isSelectable(el)) return
+        const r = resolveBinding(binding.value)
+        const prev = previousConditionMap.get(el) ?? false
+        previousConditionMap.set(el, r.condition)
+        if (!prev && r.condition) performSelection(el, r)
+      },
+      unmounted(el) { previousConditionMap.delete(el) },
+    }
+
+    const { createApp, ref } = Vue
+    createApp({
+      setup() {
+        return {
+          selectAll: ref(false),
+          rangeOpts: ref({ condition: false, start: 0, end: 5 }),
+          selectTextarea: ref(false),
+        }
+      },
+    })
+    .directive('select-text', vSelectText)
+    .mount('#app')
+  </script>
+</body>
+</html>
