@@ -4,117 +4,179 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>v-select-text Playground</title>
-  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, -apple-system, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; }
-    h1 { font-size: 1.4rem; margin-bottom: 24px; }
-    h2 { font-size: 1.1rem; margin: 24px 0 12px; }
-    label { display: block; margin-bottom: 6px; font-weight: 500; }
-    input, textarea { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
-    textarea { min-height: 80px; resize: vertical; }
-    button { padding: 8px 16px; border: none; border-radius: 6px; background: #4f46e5; color: #fff; font-size: 0.9rem; cursor: pointer; margin-top: 8px; }
-    button:hover { background: #4338ca; }
-    .section { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-    .note { font-size: 0.85rem; color: #6b7280; margin-top: 6px; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
+    h1 { font-size: 1.5rem; }
+    h2 { font-size: 1.05rem; margin: 0 0 .35rem; }
+    p.hint { font-size: .85rem; color: #666; margin: .25rem 0 .75rem; }
+    section { border: 1px solid #e0e0e0; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+    button { cursor: pointer; padding: .4rem .9rem; border: 1px solid #ccc; border-radius: 6px; background: #f5f5f5; font-size: .9rem; }
+    button:hover { background: #e8e8e8; }
+    input, textarea { font: inherit; padding: .4rem .5rem; border: 1px solid #ccc; border-radius: 6px; width: 100%; }
+    code { background: #f0f0f0; padding: .1rem .35rem; border-radius: 4px; }
+    /* Inline padding on a wrapped <code> overlaps the neighbouring line; give the
+       prose room and let a code host be a block of its own. */
+    p.hint, .log { line-height: 1.85; }
+    code.host { display: inline-block; margin-bottom: .35rem; }
+    .host { border: 1px dashed #bbb; border-radius: 6px; padding: .5rem .65rem; }
+    .host[contenteditable] { background: #fcfcfc; }
+    .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-top: .6rem; }
+    .log { font-size: .8rem; color: #444; background: #fafafa; border-radius: 6px; padding: .5rem; margin-top: .75rem; white-space: pre-wrap; }
+    .pre { white-space: pre; font-family: ui-monospace, monospace; }
+
+    /* State attributes the directive writes — style without a handler. */
+    [data-select-text="selected"] { outline: 2px solid #2563eb; outline-offset: 2px; }
+    [data-select-text-copy="copied"]::after { content: ' ✓ copied'; color: #16a34a; font-size: .8em; }
+    [data-select-text-copy="error"]::after { content: ' ✗ refused'; color: #dc2626; font-size: .8em; }
   </style>
 </head>
 <body>
   <div id="app">
     <h1>v-select-text Playground</h1>
+    <p class="hint">
+      Loaded from <code>./dist/vSelectText.min.js</code> through an import map — no bundler. These are
+      the exact bytes a consumer gets from <code>import '@ozjsey/v-select-text'</code>.
+      Rebuild with <code>npm run build</code> if you have edited <code>src/</code>.
+    </p>
 
-    <div class="section">
-      <h2>Boolean toggle</h2>
-      <label>Click the button, then click the input to see selection:</label>
-      <input v-select-text="selectAll" value="Hello World" />
-      <button @click="selectAll = !selectAll">
-        Toggle ({{ selectAll }})
-      </button>
-      <p class="note">Selects all text on each false &rarr; true transition.</p>
-    </div>
+    <section>
+      <h2>1 · Bare — select everything on mount</h2>
+      <p class="hint">No value at all. Equivalent to <code>enabled: true</code> with no range.</p>
+      <input v-select-text value="Selected the moment this mounted" />
+    </section>
 
-    <div class="section">
-      <h2>Range selection</h2>
-      <label>Selects characters 0&ndash;5 ("Hello"):</label>
-      <input v-select-text="rangeOpts" value="Hello World" />
-      <button @click="rangeOpts = { ...rangeOpts, condition: !rangeOpts.condition }">
-        Toggle ({{ rangeOpts.condition }})
-      </button>
-      <p class="note">Uses setSelectionRange(0, 5).</p>
-    </div>
+    <section>
+      <h2>2 · <code>enabled</code>, on the default <code>edge</code> trigger</h2>
+      <p class="hint">Fires on each <code>false → true</code> transition — not on every re-render.</p>
+      <input v-select-text="enabled" value="Toggle below to re-select" />
+      <div class="row">
+        <button @click="enabled = !enabled">enabled = {{ enabled }}</button>
+        <button @click="bump++">unrelated re-render ({{ bump }})</button>
+        <span class="hint">the re-render must NOT re-select</span>
+      </div>
+    </section>
 
-    <div class="section">
-      <h2>Textarea support</h2>
-      <label>Works the same way on textareas:</label>
-      <textarea v-select-text="selectTextarea">Multi-line text content goes here.</textarea>
-      <button @click="selectTextarea = !selectTextarea">
-        Toggle ({{ selectTextarea }})
-      </button>
-    </div>
+    <section>
+      <h2>3 · A character range</h2>
+      <p class="hint"><code>{ start, end }</code> in UTF-16 code units. Out-of-range values clamp.</p>
+      <input v-select-text="range" value="Hello World" />
+      <div class="row">
+        <button @click="range = { enabled: true, start: 0, end: 5, trigger: 'always' }">0 → 5</button>
+        <button @click="range = { enabled: true, start: 6, end: 11, trigger: 'always' }">6 → 11</button>
+        <button @click="range = { enabled: true, start: 3, end: 99, trigger: 'always' }">3 → 99 (clamps)</button>
+      </div>
+    </section>
 
-    <div class="section">
-      <h2>Bare directive (always selects on mount)</h2>
-      <input v-select-text value="Selected on mount" />
-      <p class="note">No binding value &mdash; selects immediately on mount.</p>
-    </div>
+    <section>
+      <h2>4 · <code>match</code> — select a needle, not an offset</h2>
+      <p class="hint">A string, a number, or a RegExp. <code>matchIndex</code> picks the occurrence; <code>-1</code> is the last.</p>
+      <p class="host" v-select-text="matchOpts">
+        Order 4821 shipped on 2026-08-23, order 4822 ships on 2026-09-01.
+      </p>
+      <div class="row">
+        <button @click="matchOpts = { enabled: true, trigger: 'always', match: /\d{4}-\d{2}-\d{2}/ }">first date</button>
+        <button @click="matchOpts = { enabled: true, trigger: 'always', match: /\d{4}-\d{2}-\d{2}/, matchIndex: -1 }">last date</button>
+        <button @click="matchOpts = { enabled: true, trigger: 'always', match: 4821 }">number 4821</button>
+        <button @click="matchOpts = { enabled: true, trigger: 'always', match: 'nothing here' }">no match → no selection</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>5 · <code>trigger: 'click'</code> + <code>copy: true</code></h2>
+      <p class="hint">
+        The clipboard needs transient user activation, so <code>copy</code> wants the click trigger.
+        Watch <code>data-select-text-copy</code> below — and the <code>select-text-copy</code> event.
+      </p>
+      <code class="host" v-select-text="{ trigger: 'click', copy: true }"
+            @select-text-copy="onCopy">npm i @ozjsey/v-select-text</code>
+      <p class="hint">Click the line above. It selects, then writes exactly what it selected.</p>
+      <p class="log">copy event: {{ copyLog || '—' }}</p>
+    </section>
+
+    <section>
+      <h2>6 · contenteditable, and a plain text host</h2>
+      <p class="hint">Not just inputs — <code>kind</code> on the event reports which strategy ran.</p>
+      <div class="host" contenteditable="true" v-select-text="{ trigger: 'click', match: 'editable' }">
+        Click me — the word editable gets selected, inside a contenteditable host.
+      </div>
+      <p class="host" v-select-text="{ trigger: 'click', match: 'spans two' }" style="margin-top:.6rem">
+        This sentence <strong>spans two</strong> elements, and the match crosses the boundary.
+      </p>
+    </section>
+
+    <section>
+      <h2>7 · <code>whitespace</code> — offsets against rendered vs raw text</h2>
+      <p class="hint">
+        <code>'collapse'</code> (default) counts a run of whitespace as one space, so offsets match what
+        you see. <code>'preserve'</code> uses raw <code>textContent</code> — correct under <code>white-space: pre</code>.
+      </p>
+      <pre class="host pre" v-select-text="{ trigger: 'click', start: 0, end: 7, whitespace: 'preserve' }">  const x = 1
+  const y = 2</pre>
+      <p class="hint">Click it: the first 7 raw characters, indentation included.</p>
+    </section>
+
+    <section>
+      <h2>8 · <code>useSelectText</code> — the same engine, no directive</h2>
+      <p class="hint">Drive it from your own handler. <code>copy()</code> runs inside the click's activation.</p>
+      <input ref="composableTarget" value="Driven by the composable" />
+      <div class="row">
+        <button @click="api.select()">select()</button>
+        <button @click="api.copy()">copy()</button>
+        <button @click="api.clear()">clear()</button>
+        <button @click="api.update({ start: 0, end: 6 })">update({ start: 0, end: 6 })</button>
+      </div>
+      <p class="log">state: {{ api.state.value }}   ·   copyState: {{ api.copyState.value }}</p>
+    </section>
+
+    <section>
+      <h2>9 · The event</h2>
+      <p class="hint"><code>select-text</code> reports the resolved range, the text, and the host kind.</p>
+      <input v-select-text="{ trigger: 'always', enabled: true }" value="Every selection logs below"
+             @select-text="onSelect" />
+      <p class="log">{{ eventLog || 'No event yet.' }}</p>
+    </section>
   </div>
 
+  <script type="importmap">
+  { "imports": { "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js" } }
+  </script>
   <script type="module">
-    // In a real project you'd import from the package:
-    // import { vSelectText } from 'v-select-text'
-    //
-    // For the playground we inline a simplified version:
-    const previousConditionMap = new WeakMap()
+    import { createApp, ref, useTemplateRef } from 'vue'
+    import { SelectTextPlugin, useSelectText } from './dist/vSelectText.min.js'
 
-    function resolveBinding(value) {
-      if (value === undefined || value === true) return { condition: true }
-      if (value === false) return { condition: false }
-      return { condition: value.condition ?? true, start: value.start, end: value.end, direction: value.direction ?? 'forward' }
-    }
-
-    function isSelectable(el) {
-      return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement
-    }
-
-    function performSelection(el, resolved) {
-      if (resolved.start !== undefined || resolved.end !== undefined) {
-        const s = resolved.start ?? 0
-        const e = resolved.end ?? el.value.length
-        try { el.setSelectionRange(s, e, resolved.direction) } catch { el.select() }
-      } else {
-        el.select()
-      }
-    }
-
-    const vSelectText = {
-      mounted(el, binding) {
-        if (!isSelectable(el)) { console.warn('[v-select-text] Directive only works on <input> and <textarea> elements.'); return }
-        const r = resolveBinding(binding.value)
-        previousConditionMap.set(el, r.condition)
-        if (r.condition) performSelection(el, r)
-      },
-      updated(el, binding) {
-        if (!isSelectable(el)) return
-        const r = resolveBinding(binding.value)
-        const prev = previousConditionMap.get(el) ?? false
-        previousConditionMap.set(el, r.condition)
-        if (!prev && r.condition) performSelection(el, r)
-      },
-      unmounted(el) { previousConditionMap.delete(el) },
-    }
-
-    const { createApp, ref } = Vue
     createApp({
       setup() {
-        return {
-          selectAll: ref(false),
-          rangeOpts: ref({ condition: false, start: 0, end: 5 }),
-          selectTextarea: ref(false),
+        const enabled = ref(false)
+        const bump = ref(0)
+        const range = ref({ enabled: true, start: 0, end: 5, trigger: 'always' })
+        const matchOpts = ref({ enabled: true, trigger: 'always', match: /\d{4}-\d{2}-\d{2}/ })
+
+        const copyLog = ref('')
+        const onCopy = (e) => {
+          const d = e.detail
+          copyLog.value = d.ok
+            ? `ok — wrote ${JSON.stringify(d.text)}`
+            : `refused — reason: ${d.reason}`
         }
+
+        const eventLog = ref('')
+        const onSelect = (e) => {
+          const d = e.detail
+          eventLog.value = `kind=${d.kind}  start=${d.start}  end=${d.end}  direction=${d.direction}\ntext=${JSON.stringify(d.text)}`
+        }
+
+        const composableTarget = useTemplateRef('composableTarget')
+        const api = useSelectText({
+          target: () => composableTarget.value,
+          options: { copy: true },
+        })
+
+        return { enabled, bump, range, matchOpts, copyLog, onCopy, eventLog, onSelect, composableTarget, api }
       },
     })
-    .directive('select-text', vSelectText)
-    .mount('#app')
+      .use(SelectTextPlugin)
+      .mount('#app')
   </script>
 </body>
 </html>

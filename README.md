@@ -10,10 +10,6 @@ See in action: [npm portfolio playground](https://ozjsey.github.io/npm-portfolio
 [inputs and textareas](https://ozjsey.github.io/npm-portfolio-playground/#v-select-text/input) ·
 [`useSelectText`](https://ozjsey.github.io/npm-portfolio-playground/#v-select-text/composable)
 
-## Playground
-
-Try the live examples in the [npm portfolio playground](https://github.com/ozJSey/npm-portfolio-playground).
-
 ## Select the rendered text of any element — whole, by range, or by pattern
 
 Selecting an `<input>` is one line of vanilla JS (`el.select()`) and needs no directive. Selecting the *rendered text* of a `<p>`, a `<blockquote>`, a `<td>` or a `<code>` block — across nested markup, at offsets that survive template indentation, or by a pattern you only know at runtime — is the thing that actually needs one.

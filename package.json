@@ -6,11 +6,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ozJSey/vue-select-text.git"
+    "url": "git+https://github.com/ozjsey/v-select-text.git"
   },
-  "homepage": "https://github.com/ozJSey/vue-select-text#readme",
+  "homepage": "https://github.com/ozjsey/v-select-text#readme",
   "bugs": {
-    "url": "https://github.com/ozJSey/vue-select-text/issues"
+    "url": "https://github.com/ozjsey/v-select-text/issues"
   },
   "type": "module",
   "main": "dist/vSelectText.min.cjs",
@@ -30,7 +30,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsup vSelectText.ts --format esm,cjs --minify --sourcemap --dts --out-dir dist --clean && mv dist/vSelectText.js dist/vSelectText.min.js && mv dist/vSelectText.js.map dist/vSelectText.min.js.map && mv dist/vSelectText.cjs dist/vSelectText.min.cjs && mv dist/vSelectText.cjs.map dist/vSelectText.min.cjs.map && mv dist/vSelectText.d.cts dist/vSelectText.min.d.cts && node -e \"const fs=require('fs');for(const f of ['vSelectText.min.js','vSelectText.min.cjs']){const p='dist/'+f;let s=fs.readFileSync(p,'utf8');s=s.replace(/\\/\\/# sourceMappingURL=vSelectText\\.(js|cjs)\\.map/, '//# sourceMappingURL='+f+'.map');fs.writeFileSync(p,s);}\"",
