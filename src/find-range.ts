@@ -2,8 +2,10 @@
  * "Which characters does this binding ask for?" — answered against a plain
  * string, so both selection strategies share one implementation: the input
  * path passes `el.value`, the Range path passes the flat subtree text.
+ *
+ * This is also where offsets are clamped, because clamping needs a length and
+ * this is the only module that has one.
  */
-import { normalizeOffset } from './resolve'
 import type { ResolvedBinding } from './types'
 
 export type RequestedRange =
@@ -11,8 +13,28 @@ export type RequestedRange =
   | { mode: 'all' }
   /** An explicit or matched slice. */
   | { mode: 'range'; start: number; end: number }
-  /** A `match` that is not in the text. Nothing to select, nothing to report. */
+  /** A `match` that is not in the text, or a request that cannot be read. */
   | { mode: 'none' }
+
+/**
+ * Normalize a readable offset to an integer within `[0, maxLen]`.
+ *
+ * `resolve.ts` has already established that this is `undefined` or a non-NaN
+ * number, so the only work left is clamping. ±Infinity is clamped rather than
+ * rejected: it is out of range, and `SelectTextOptions.start` documents out of
+ * range as clamped. That is what makes `{ start: Infinity }` collapse to the
+ * end of the text and therefore select **nothing**, instead of falling through
+ * to "no range given" and selecting **everything**.
+ */
+export function normalizeOffset(value: number | undefined, maxLen: number): number | undefined {
+  if (value === undefined) return undefined
+  if (value === Infinity) return maxLen
+  if (value === -Infinity) return 0
+  const truncated = Math.trunc(value)
+  if (truncated < 0) return 0
+  if (truncated > maxLen) return maxLen
+  return truncated
+}
 
 /**
  * Occurrences of `match` in `text`, in document order, non-overlapping.
@@ -62,6 +84,12 @@ function findOccurrences(
 }
 
 export function findRange(text: string, resolved: ResolvedBinding): RequestedRange {
+  // An option the binding supplied and `resolve.ts` could not read. "Select
+  // nothing" is the only safe answer: every other reading widens a request the
+  // consumer got wrong, and the widest of them — "no range given" — means the
+  // whole host.
+  if (resolved.unreadable !== null) return { mode: 'none' }
+
   if (resolved.match !== undefined) {
     const from = resolved.matchIndex
     const found = findOccurrences(text, resolved.match, from < 0 ? Infinity : from + 1)

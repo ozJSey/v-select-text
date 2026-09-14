@@ -794,18 +794,27 @@ describe('detail.text reports what is now selected, for every kind', () => {
     expect(fire(el, true)).toMatchObject({ start: 0, end: 11, text: 'Hello World' })
   })
 
-  it('select() fallback path: the whole value, because that is what got selected', () => {
+  it('a ranged request the field rejects reports NOTHING, rather than the whole value', () => {
     // jsdom rejects setSelectionRange on type="number" exactly as browsers do,
-    // so this exercises the real fallback rather than a stub: the reported
-    // text is what is actually selected, not what was requested.
+    // so this exercises the real refusal rather than a stub. It used to answer
+    // with `{ start: 0, end: 5, text: '12345' }` — technically truthful, and
+    // five times the request. With `copy: true` that is the clipboard.
     const el = document.createElement('input')
     el.type = 'number'
     el.value = '12345'
     document.body.appendChild(el)
 
-    const detail = fire(el, { start: 0, end: 3 })
+    expect(fire(el, { start: 0, end: 3 })).toBeNull()
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('refuses `setSelectionRange`'))
+  })
 
-    expect(detail).toMatchObject({ start: 0, end: 5, text: '12345', kind: 'input' })
+  it('the WHOLE value of the same field is still selectable through select()', () => {
+    const el = document.createElement('input')
+    el.type = 'number'
+    el.value = '12345'
+    document.body.appendChild(el)
+
+    expect(fire(el, true)).toMatchObject({ start: 0, end: 5, text: '12345', kind: 'input' })
   })
 })
 
@@ -996,9 +1005,28 @@ describe('regression: the map counts only text the browser paints', () => {
     expect(fire(el, true)?.text).toBe('a   b')
   })
 
-  it("'preserve' stays raw textContent, hidden nodes included", () => {
+  it("'preserve' keeps the whitespace and still skips what is not painted", () => {
+    // The old behaviour — a bare TreeWalker over every text node — meant the
+    // documented use for 'preserve' (a <code> block) could `match`, select and
+    // COPY a `display: none` fragment, with no diagnostic. 'preserve' is about
+    // whitespace, not about visibility.
     const el = host('<span style="display:none">HID</span>Hello')
-    expect(fire(el, { whitespace: 'preserve' })?.text).toBe('HIDHello')
+    expect(fire(el, { whitespace: 'preserve' })?.text).toBe('Hello')
+  })
+
+  it("'preserve' cannot match into hidden text", () => {
+    const el = host('<span style="display:none">SECRET-TOKEN</span>visible')
+    expect(fire(el, { whitespace: 'preserve', match: 'SECRET-TOKEN' })).toBeNull()
+  })
+
+  it("'preserve' skips <script> and <style> the way 'collapse' does", () => {
+    const el = host('<style>.a{color:red}</style><script>var x=1</script>keep')
+    expect(fire(el, { whitespace: 'preserve' })?.text).toBe('keep')
+  })
+
+  it("'preserve' still keeps every space and newline of the text it does show", () => {
+    const el = host('<span>a  b</span>\n  c')
+    expect(fire(el, { whitespace: 'preserve' })?.text).toBe('a  b\n  c')
   })
 })
 
@@ -1051,11 +1079,12 @@ describe('regression: matchIndex coercion matches its documentation', () => {
     expect(fire(host(text), { match: 'a', matchIndex: 1.9 })?.start).toBe(2)
   })
 
-  it('treats NaN and a non-number as 0', () => {
-    expect(fire(host(text), { match: 'a', matchIndex: Number.NaN })?.start).toBe(0)
-    expect(
-      fire(host(text), { match: 'a', matchIndex: 'x' as unknown as number })?.start,
-    ).toBe(0)
+  it('refuses a matchIndex it cannot read, rather than silently meaning 0', () => {
+    // "Occurrence NaN" is not occurrence zero. Quietly picking the first hit is
+    // the same class of guess as reading an unreadable `start` as "unset".
+    expect(fire(host(text), { match: 'a', matchIndex: Number.NaN })).toBeNull()
+    expect(fire(host(text), { match: 'a', matchIndex: 'x' as unknown as number })).toBeNull()
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('`matchIndex` this directive cannot read'))
   })
 
   it('selects nothing for an out-of-range index in either direction', () => {
@@ -1077,7 +1106,7 @@ describe('regression: match: null is a needle that has not arrived', () => {
 })
 
 describe('regression: an input select-all reports the direction it applied', () => {
-  it("reports 'forward' because select() takes no direction", () => {
+  it('honours the requested direction on the whole-value path too', () => {
     const el = document.createElement('input')
     el.value = 'hello'
     document.body.appendChild(el)
@@ -1091,6 +1120,10 @@ describe('regression: an input select-all reports the direction it applied', () 
       null as never,
     )
 
-    expect(detail!.direction).toBe('forward')
+    // Was 'forward' unconditionally, because the whole-value path went through
+    // `el.select()`, which takes no direction argument. It goes through
+    // `setSelectionRange(0, length, direction)` now — same characters, no stolen
+    // focus, and the direction the binding asked for.
+    expect(detail!.direction).toBe('backward')
   })
 })

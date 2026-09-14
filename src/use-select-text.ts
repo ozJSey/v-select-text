@@ -5,7 +5,7 @@
 import { getCurrentScope, onScopeDispose, ref, type Ref } from 'vue'
 import { getElementKind, warnUnsupported } from './element-kind'
 import { resolveBinding } from './resolve'
-import { selectAndReport, type SelectTextCycle } from './selection'
+import { clearSelection, selectAndReport, type SelectTextCycle } from './selection'
 import type {
   SelectTextCopyDetail,
   SelectTextCopyState,
@@ -13,20 +13,7 @@ import type {
   SelectTextOptions,
 } from './types'
 
-/**
- * Imperative companion to `v-select-text`.
- *
- * @example
- *   const inputRef = ref<HTMLInputElement | null>(null)
- *   const selection = useSelectText({
- *     target: () => quoteRef.value,
- *     options: { match: 'the important bit' },
- *   })
- *   onMounted(selection.select)
- *
- * SSR-safe: returns a no-op API on the server. `state` starts at `'idle'`
- * and stays there until `select()` actually fires.
- */
+/** Constructor arguments for {@link useSelectText}. */
 export interface UseSelectTextParams {
   /**
    * Element to operate on. Required. Accepts the element directly, a getter
@@ -37,7 +24,14 @@ export interface UseSelectTextParams {
     | HTMLElement
     | (() => HTMLElement | null)
     | null
-  /** Initial / current options. Mutable via {@link UseSelectTextReturn.update}. */
+  /**
+   * Options for every cycle this instance runs.
+   *
+   * Read **once**, at construction. Mutating the object you passed in has no
+   * effect afterwards — {@link UseSelectTextReturn.update} is the only door, and
+   * it shallow-merges, so `update({ end: 7 })` keeps the `start` you started
+   * with.
+   */
   options?: SelectTextOptions
 }
 
@@ -69,16 +63,59 @@ export interface UseSelectTextReturn {
    * rejects.
    */
   copy: () => Promise<SelectTextCopyDetail | null>
-  /** Clear the current selection (where supported). */
+  /**
+   * Clear the selection **this target holds**, and reset `state` / `copyState`.
+   *
+   * A document selection that is not inside the target is left alone: a
+   * modal-close or route-leave handler tidying up must not destroy whatever the
+   * user had highlighted elsewhere on the page.
+   */
   clear: () => void
   /** Re-read options without forcing a selection cycle. */
   update: (next: SelectTextOptions) => void
 }
 
+/**
+ * Imperative companion to `v-select-text` — the same selection logic driven
+ * from a `setup()` context instead of a template binding.
+ *
+ * SSR-safe: returns a no-op API on the server. `state` starts at `'idle'` and
+ * stays there until a cycle actually selects something.
+ *
+ * @example
+ *   const quoteRef = ref<HTMLElement | null>(null)
+ *   const selection = useSelectText({
+ *     target: () => quoteRef.value,
+ *     options: { match: 'the important bit' },
+ *   })
+ *   onMounted(selection.select)
+ *
+ * @example copy from inside your own click handler
+ *   const api = useSelectText({ target: () => tokenRef.value })
+ *   async function onClick() {
+ *     const result = await api.copy()   // never rejects; null if nothing was selected
+ *     toast(result?.ok ? 'Copied' : 'Could not copy')
+ *   }
+ *
+ * @see vSelectText for the directive form.
+ */
 export function useSelectText(params: UseSelectTextParams): UseSelectTextReturn {
   const state = ref<'idle' | 'selected'>('idle')
   const copyState = ref<SelectTextCopyState>('idle')
   let lastOpts: SelectTextOptions = { ...(params.options ?? {}) }
+
+  /**
+   * Monotonic attempt counter, the composable's mirror of `copySeqMap`.
+   *
+   * `copyState` is a second view of the state `data-select-text-copy` already
+   * holds, and the attribute has been sequence-guarded since SEL-2: a slow
+   * earlier write cannot take back what a later one already settled. Without
+   * the same guard here the two views disagreed — the attribute reading
+   * `'copied'` while a UI bound to `copyState` painted a red cross for the copy
+   * that succeeded. `clear()` bumps it too, so a write already in flight can no
+   * longer un-reset the `'idle'` the user just asked for.
+   */
+  let copySeq = 0
 
   function resolveTargetEl(): HTMLElement | null {
     if (!params.target) return null
@@ -125,9 +162,12 @@ export function useSelectText(params: UseSelectTextParams): UseSelectTextReturn 
     // gesture that called us, not after an await. See src/copy.ts.
     const cycle = runCycle(true)
     if (!cycle?.copying) return Promise.resolve(null)
+    const seq = ++copySeq
     copyState.value = 'pending'
     return cycle.copying.then((result) => {
-      copyState.value = result.ok ? 'copied' : 'error'
+      // Report every attempt to the caller — a swallowed failure is worse than
+      // a stale ref — but only the newest one owns the shared state.
+      if (seq === copySeq) copyState.value = result.ok ? 'copied' : 'error'
       return result
     })
   }
@@ -135,22 +175,13 @@ export function useSelectText(params: UseSelectTextParams): UseSelectTextReturn 
   function clearApi() {
     if (typeof window === 'undefined') return
     const el = resolveTargetEl()
-    // An input keeps its own selection, untouched by the document one, so
-    // clearing only `window.getSelection()` would leave the field highlighted
-    // while `state` claimed otherwise.
-    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-      try {
-        el.setSelectionRange(0, 0)
-      } catch {
-        /* the input types that reject setSelectionRange hold no selection anyway */
-      }
-    }
-    try {
-      const sel = window.getSelection()
-      if (sel) sel.removeAllRanges()
-    } catch {
-      /* noop */
-    }
+    // `selection.ts` owns every mutation of the document selection, including
+    // this one — and it is what checks that the selection being dropped is
+    // actually this host's, rather than the one the user made somewhere else.
+    if (el) clearSelection(el)
+    // Retire any write still in flight: its `.then` would otherwise write
+    // 'copied' a tick after the user pressed Clear.
+    copySeq++
     state.value = 'idle'
     copyState.value = 'idle'
   }
@@ -163,6 +194,11 @@ export function useSelectText(params: UseSelectTextParams): UseSelectTextReturn 
     lastOpts = { ...lastOpts, ...next }
   }
 
+  /** Same reason as `clear()`: nothing in flight may write to a dead scope. */
+  function retireInFlight() {
+    copySeq++
+  }
+
   // Composable plays nicely with auto-cleanup: when the scope dies, drop the
   // selected state so dependents (e.g. badge UIs) reset.
   // `onScopeDispose` warns when there's no active scope (eg. plain script
@@ -170,6 +206,7 @@ export function useSelectText(params: UseSelectTextParams): UseSelectTextReturn 
   // usable outside `setup()` / `effectScope.run()` without spam.
   if (getCurrentScope()) {
     onScopeDispose(() => {
+      retireInFlight()
       state.value = 'idle'
       copyState.value = 'idle'
     })

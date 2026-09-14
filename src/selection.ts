@@ -6,7 +6,13 @@
  * This is the only file where a selection actually happens.
  */
 import { startCopy } from './copy'
-import { warnIfNotRendered, warnIfUnselectable, type SelectableInput } from './element-kind'
+import {
+  warnIfNotRendered,
+  warnIfUnselectable,
+  warnNoRangeSupport,
+  warnUnreadableOption,
+  type SelectableInput,
+} from './element-kind'
 import { findRange } from './find-range'
 import { anchorAt, buildTextMap } from './text-map'
 import type {
@@ -40,21 +46,34 @@ function selectInputOrTextarea(
   const requested = findRange(value, resolved)
   if (requested.mode === 'none') return null
 
-  const selectAll = (): SelectTextEventDetail | null => {
-    // An empty field has nothing to select. `el.select()` would still focus it
-    // and the cycle would report `text: ''` — a selection that does not exist.
+  if (requested.mode === 'all') {
+    // An empty field has nothing to select, and `el.select()` would still focus
+    // it while the cycle reported `text: ''` — a selection that does not exist.
     if (value.length === 0) return null
     try {
-      el.select()
-      // `HTMLInputElement.select()` takes no direction, so reporting the
-      // requested one would be a lie — it always anchors forward.
-      return { start: 0, end: value.length, text: value, direction: 'forward', kind }
+      // `setSelectionRange` over the whole value, not `el.select()`. The two
+      // select the same characters, but `select()` also FOCUSES the field
+      // (measured in Chrome; jsdom's does not, which is why no unit test could
+      // ever arbitrate it). A directive that steals focus on mount scrolls a
+      // modal or a long page to itself, and which of the two ran used to depend
+      // on whether the binding carried offsets.
+      el.setSelectionRange(0, value.length, resolved.direction)
+      return { start: 0, end: value.length, text: value, direction: resolved.direction, kind }
     } catch {
-      return null
+      // `type="number"` / `type="email"` reject `setSelectionRange` outright.
+      // `select()` is then the only way to select their value at all — so this
+      // is the one path in the package that moves focus, and it runs only for a
+      // whole-value request the engine has already refused. README documents it.
+      try {
+        el.select()
+        // `HTMLInputElement.select()` takes no direction, so reporting the
+        // requested one would be a lie — it always anchors forward.
+        return { start: 0, end: value.length, text: value, direction: 'forward', kind }
+      } catch {
+        return null
+      }
     }
   }
-
-  if (requested.mode === 'all') return selectAll()
 
   const { start, end } = requested
   // A collapsed request is a caret, not a selection: leave the field's own
@@ -64,9 +83,14 @@ function selectInputOrTextarea(
     el.setSelectionRange(start, end, resolved.direction)
     return { start, end, text: value.slice(start, end), direction: resolved.direction, kind }
   } catch {
-    // `type="number"` / `type="email"` reject setSelectionRange in real
-    // browsers. Selecting everything beats selecting nothing.
-    return selectAll()
+    // The engine refuses a ranged selection on this input type. This used to
+    // fall back to `select()`, which answers "select these five characters"
+    // with "select all thirty" — chosen by which branch threw rather than by
+    // anything the consumer asked for. With `copy: true` that put a user's
+    // whole email address on the clipboard in place of the local part, and
+    // reported `start: 0, end: value.length` while doing it. Refuse and say so.
+    warnNoRangeSupport(el)
+    return null
   }
 }
 
@@ -212,6 +236,11 @@ export function selectAndReport(
   resolved: ResolvedBinding,
   origin: SelectTextOrigin,
 ): SelectTextCycle | null {
+  // The one place a binding the package could not read is reported. Here rather
+  // than in `resolve.ts`, which is pure and has no element to key a
+  // warn-once on, and rather than in the two callers, which would have to
+  // remember to do it.
+  warnUnreadableOption(el, resolved.unreadable)
   const detail = performSelection(el, kind, resolved)
   if (!detail) return null
   const copying = resolved.copy
@@ -219,4 +248,41 @@ export function selectAndReport(
     : null
   dispatchSelectTextEvent(el, detail)
   return { detail, copying }
+}
+
+/**
+ * Drop the selection **this host owns** — and only that one.
+ *
+ * `useSelectText().clear()` used to call `sel.removeAllRanges()` unconditionally
+ * from its own file, with no check that the document selection had anything to
+ * do with the target: a route-leave hook tidying up a `<p>` that never selected
+ * anything destroyed whatever the user had highlighted in an unrelated
+ * `<aside>`. That is the same hazard `applyRange`'s ordering was written to
+ * avoid, so the fix is not another check in the composable — it is that
+ * clearing lives here, in the module that owns the selection, next to the code
+ * that makes one.
+ *
+ * An `<input>` / `<textarea>` keeps its own selection, invisible to the
+ * document one, so clearing only `window.getSelection()` would leave the field
+ * highlighted while `state` claimed otherwise.
+ */
+export function clearSelection(el: HTMLElement): void {
+  if (typeof window === 'undefined') return
+
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    try {
+      el.setSelectionRange(0, 0)
+    } catch {
+      /* the input types that reject setSelectionRange hold no selection anyway */
+    }
+  }
+
+  try {
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0) return
+    if (!el.contains(sel.getRangeAt(0).commonAncestorContainer)) return
+    sel.removeAllRanges()
+  } catch {
+    /* noop */
+  }
 }

@@ -3,6 +3,7 @@
  * "what do we remember about an element" has exactly one answer. WeakMap so
  * GC'd elements don't leak.
  */
+import type { ResolvedBinding } from './types'
 
 /**
  * Whether the `'edge'` trigger has been spent for this element — `enabled` is
@@ -14,6 +15,17 @@
  * when the content does. SEL-4.
  */
 export const edgeSpentMap = new WeakMap<HTMLElement, boolean>()
+
+/**
+ * The late-text watch for a host that is armed and has selected nothing yet —
+ * the `MutationObserver` plus the binding the cycle it runs should use. Present
+ * only while the host is waiting for its content; see `late-text.ts` for why
+ * that window is the whole safety argument.
+ */
+export const lateTextMap = new WeakMap<
+  HTMLElement,
+  { observer: MutationObserver; resolved: ResolvedBinding }
+>()
 
 /**
  * Teardown for the listeners `trigger: 'click'` installed on an element — the
@@ -37,11 +49,36 @@ export const keyboardAffordanceMap = new WeakMap<
   { tabindex: boolean; role: boolean }
 >()
 
-/** Elements already warned about `user-select: none` — warn once, not per fire. */
-export const unselectableWarned = new WeakSet<HTMLElement>()
+/**
+ * Elements whose `user-select` has been **checked** — warn once, not per fire.
+ *
+ * Named for the check rather than the warning on purpose. Memoizing only the
+ * hosts that turned out to be unselectable left every ordinary host resolving
+ * styles again on every selection cycle, in production, to reach the same
+ * "nothing to say" it reached last time. The visible contract (at most one
+ * warning per element) is unchanged; the cost is not.
+ */
+export const unselectableChecked = new WeakSet<HTMLElement>()
 
-/** Elements already warned about rendering nothing (`display: none`, hidden ancestor). */
-export const notRenderedWarned = new WeakSet<HTMLElement>()
+/**
+ * Elements whose ancestor chain has been **checked** for `display: none` /
+ * `visibility: hidden`. Same memoize-the-check rule, and the more expensive of
+ * the two: the walk resolves a style per ancestor.
+ */
+export const notRenderedChecked = new WeakSet<HTMLElement>()
+
+/**
+ * Elements already warned that the binding carried an option this code cannot
+ * read (`match`, `matchIndex`, `start`, `end`) — warn once per element, not per
+ * option and not per render.
+ */
+export const unreadableWarned = new WeakSet<HTMLElement>()
+
+/**
+ * Elements already warned that their input type refuses `setSelectionRange`, so
+ * a ranged request cannot be honoured — warn once.
+ */
+export const noRangeWarned = new WeakSet<HTMLElement>()
 
 /**
  * Elements already warned about holding no selectable text. `updated` runs on

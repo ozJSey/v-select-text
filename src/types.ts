@@ -69,6 +69,10 @@ export type SelectTextOptions = {
    * needle exists — means "no needle yet", so nothing is selected. Leaving
    * `match` off entirely is what selects the whole host.
    *
+   * A number or a bigint is read as its string form, so `{ match: orderId }`
+   * works when the API returned `4821` rather than `'4821'`. Any other type is
+   * not a needle in any reading: nothing is selected and the host warns once.
+   *
    * @example { match: 'brown fox' }
    * @example { match: /\bv-[a-z-]+\b/ }
    */
@@ -87,9 +91,16 @@ export type SelectTextOptions = {
    *
    * @remarks
    * - `< 0` is clamped to `0`
-   * - `>` the text length is clamped to the text length
-   * - `NaN` is treated as `undefined`
+   * - `>` the text length is clamped to the text length, `Infinity` included —
+   *   so `{ start: Infinity }` collapses to the end of the text and selects
+   *   **nothing**
    * - If `start > end`, the two are swapped silently to match the spec.
+   * - A value that is not a number and not `undefined` — `NaN` from
+   *   `Number('')`, `null` from a `ref<number | null>`, an unparsed string —
+   *   cannot be read, so **nothing is selected** and the host warns once. It is
+   *   deliberately *not* treated as "not supplied": that would turn
+   *   `{ start: total / count }` with `count === 0` into "select the whole
+   *   host", and with `copy: true` put the whole host on the clipboard.
    */
   start?: number
   /**
@@ -241,6 +252,17 @@ export type SelectTextCopyState = 'idle' | 'pending' | 'copied' | 'error'
  */
 export type SelectTextOrigin = 'render' | 'request'
 
+/**
+ * Which option the binding supplied that could not be read, or `null`.
+ *
+ * Internal. Carried on {@link ResolvedBinding} so `find-range.ts` can refuse the
+ * request and the caller can print one diagnostic naming the option — rather
+ * than the two things the code used to do, which were throw a `TypeError` out
+ * of a lifecycle hook (`match`) and silently widen the request to the whole
+ * host (`start` / `end`).
+ */
+export type SelectTextUnreadable = 'match' | 'matchIndex' | 'start' | 'end' | null
+
 /** What a binding value normalizes to before any DOM work happens. */
 export interface ResolvedBinding {
   enabled: boolean
@@ -252,4 +274,5 @@ export interface ResolvedBinding {
   whitespace: SelectTextWhitespace
   trigger: SelectTextTrigger
   copy: boolean
+  unreadable: SelectTextUnreadable
 }

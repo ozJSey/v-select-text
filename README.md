@@ -2,6 +2,14 @@
 
 See in action: [npm portfolio playground](https://ozjsey.github.io/npm-portfolio-playground/#v-select-text).
 
+**Or open the card for the thing you came for** — sixteen of them, all editable in the browser:
+[a paragraph selecting itself](https://ozjsey.github.io/npm-portfolio-playground/#v-select-text/static-text) ·
+[`match`](https://ozjsey.github.io/npm-portfolio-playground/#v-select-text/match) ·
+[`trigger: 'click'`](https://ozjsey.github.io/npm-portfolio-playground/#v-select-text/click-to-select) ·
+[`copy: true`](https://ozjsey.github.io/npm-portfolio-playground/#v-select-text/copy-on-select) ·
+[inputs and textareas](https://ozjsey.github.io/npm-portfolio-playground/#v-select-text/input) ·
+[`useSelectText`](https://ozjsey.github.io/npm-portfolio-playground/#v-select-text/composable)
+
 ## Playground
 
 Try the live examples in the [npm portfolio playground](https://github.com/ozJSey/npm-portfolio-playground).
@@ -268,6 +276,10 @@ Omitting both `match` and `start` / `end` selects the whole host — or nothing 
 
 ## Whitespace and offsets
 
+> The one section where a card beats the prose outright:
+> [`whitespace: 'collapse'` vs `'preserve'`](https://ozjsey.github.io/npm-portfolio-playground/#v-select-text/whitespace) puts both modes on the same indented
+> template and highlights what each one selects.
+
 This is the one thing worth reading twice, because `textContent` is **not** what the user sees.
 
 Given this template:
@@ -360,6 +372,9 @@ All of these are decided **before** the selection is installed, so the document 
 
 ## The empty host
 
+> [Text that arrives after mount](https://ozjsey.github.io/npm-portfolio-playground/#v-select-text/late-text) — the binding fires, selects nothing, and then
+> selects for real when the text lands.
+
 The most ordinary shape this directive is put into is also the one that used to break:
 
 ```vue
@@ -396,7 +411,7 @@ A `display: none` host — including one inside a `v-show="false"` tab panel or 
 a Range. The selection is real and `detail.text` is honest, but nothing is painted, so the event
 describes something the user cannot see. The directive says so once per element:
 
-```
+```text
 [v-select-text] <p> sits inside a `display: none` <div> (a `v-show="false"` ancestor, for instance), so it renders nothing and the selection cannot be painted. The event still reports the text it resolved.
 ```
 
@@ -404,6 +419,9 @@ The selection is left in place rather than refused: if the panel is shown later 
 touched the document selection, it is already there.
 
 ## Copying the selection
+
+> [`copy: true` — click, or Enter/Space, to copy](https://ozjsey.github.io/npm-portfolio-playground/#v-select-text/copy-on-select), with the clipboard read back
+> so you can see it is exactly `detail.text`.
 
 ```vue
 <code v-select-text="{ trigger: 'click', copy: true }">sk-live-9f3b2c7d41ae4e08b6c5</code>
@@ -436,6 +454,9 @@ There is **no `execCommand` fallback**. The usual temp-`<textarea>` recipe calls
 destroying the very selection this directive exists to make.
 
 ### The crux: user activation
+
+> [The activation trap, measured](https://ozjsey.github.io/npm-portfolio-playground/#v-select-text/copy-activation) reproduces the table below in your own
+> browser: the same flip timed inside the handler, 250 ms later, and six seconds later.
 
 `navigator.clipboard.writeText` needs *transient user activation*. `trigger: 'click'` is the only
 universally-legal path. The package's own default, `trigger: 'edge'`, fires on **mount** — there is
@@ -485,7 +506,7 @@ Pre-blocking would make the package less capable than the engines actually permi
 after a real click is legal (row 5), and a page that has been granted `clipboard-write` can write
 with no gesture at all (row 7) — and Safari exposes no `navigator.userActivation` to pre-check with:
 
-```
+```text
 [v-select-text] `copy: true` with `trigger: 'edge'` has no user gesture to write under. Chrome refuses that as well as Firefox and Safari — the page has to still hold a transient activation (about five seconds after a real gesture in Chrome). Use `trigger: 'click'`, or call `copy()` from `useSelectText` inside your own click handler. The attempt is still made — listen for `select-text-copy` to see what happened.
 ```
 
@@ -532,6 +553,9 @@ function onCopy(e: CustomEvent<SelectTextCopyDetail>) {
 The handler above writes state — `toast(…)` re-renders. That is safe, and the next section is why.
 
 ### `copy` under `trigger: 'always'`: once per distinct text
+
+> [`trigger: 'always'` + `copy`](https://ozjsey.github.io/npm-portfolio-playground/#v-select-text/always-copy-loop) is the loop, and the guard that stops it,
+> with a live write counter.
 
 `'always'` fires on **every** update. Pair it with `copy: true` and a `select-text-copy` handler
 that writes state — the `toast(…)` above is one — and you have a cycle: the copy settles in a
@@ -684,6 +708,9 @@ It is SSR-safe: with no `document` the API is inert and `state` stays `'idle'`.
 
 ## Triggers and edge detection
 
+> [Boolean toggle and edge detection](https://ozjsey.github.io/npm-portfolio-playground/#v-select-text/boolean-edge) — hold `enabled` true across re-renders and
+> watch nothing happen, which is the whole point of `'edge'`.
+
 | `trigger` | Fires |
 |---|---|
 | `'edge'` (default) | On each `false → true` transition of `enabled`. Mounting with `enabled: true` counts as one. |
@@ -715,7 +742,7 @@ Only two groups warn and no-op:
 - **Input types that cannot hold selectable text:** `hidden`, `file`, `image`, `submit`, `reset`, `button`, `checkbox`, `radio`, `color`, `range`
 - **Elements that hold no text node at all:** `<img>`, `<br>`, `<hr>`, `<canvas>`, `<video>`, `<audio>`, `<iframe>`, `<embed>`, `<object>`, `<select>`, `<progress>`, `<meter>`, `<svg>`
 
-```
+```text
 [v-select-text] <img> holds no selectable text. Use an <input>, a <textarea>, or any element with text content.
 ```
 
@@ -725,7 +752,7 @@ For inputs the descriptor includes the type, e.g. `<input[type="checkbox"]>`. `<
 
 A programmatic Range over a `user-select: none` subtree is a real selection that paints nothing, which reads as "the directive didn't fire". For `'text'` hosts only, the directive checks the computed style and warns once per element:
 
-```
+```text
 [v-select-text] <p> resolves to `user-select: none`, so the selection is made but never painted. Remove that rule (or set `user-select: text`) to see it.
 ```
 

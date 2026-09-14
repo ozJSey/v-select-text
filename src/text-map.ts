@@ -9,7 +9,19 @@
  * recording where every *rendered* character came from lets `start` / `end` /
  * `match` be expressed against the visible text while the Range still lands on
  * real nodes.
+ *
+ * **One walk, two whitespace modes.** `'collapse'` and `'preserve'` differ only
+ * in how whitespace is counted and whether block edges insert a separator; they
+ * do *not* differ in what is visible. Both skip `<script>` / `<style>` /
+ * `<template>`, both skip a `display: none` subtree, and both skip the text of a
+ * `visibility: hidden` element. `'preserve'` used to be a bare `TreeWalker` over
+ * every text node, which meant a hidden fragment inside a `<code>` block — the
+ * documented use for `'preserve'` — was searchable by `match`, selectable by
+ * offset, and copyable to the clipboard, with no diagnostic. The invariant the
+ * README states ("a match can never reach into text the user cannot see") is now
+ * a property of the walk rather than of one of its two modes.
  */
+import { styleOf } from './computed-style'
 import type { SelectTextWhitespace } from './types'
 
 /** Where a character in {@link TextMap.text} lives in the DOM. */
@@ -74,6 +86,12 @@ interface Walk {
   /** A separator with no source character — a block edge or a `<br>`. */
   pendingEdge: boolean
   last: TextAnchor
+  /**
+   * `whitespace: 'preserve'`. Every character is emitted as written and no
+   * synthetic separator is ever inserted, so an index into the map is an index
+   * into the visible text exactly as the DOM holds it.
+   */
+  verbatim: boolean
 }
 
 function emit(walk: Walk, char: string, node: Node, offset: number): void {
@@ -90,9 +108,17 @@ function emit(walk: Walk, char: string, node: Node, offset: number): void {
   walk.last = { node, offset: offset + 1 }
 }
 
-function walkRendered(el: Element, preserve: boolean, walk: Walk): void {
+/**
+ * @param preserve  this element's own `white-space` keeps its runs as written.
+ *                  Always true in verbatim mode.
+ * @param painted   whether text nodes at this level are painted. False under a
+ *                  `visibility: hidden` element — the text exists, occupies
+ *                  space, and shows nothing.
+ */
+function walkRendered(el: Element, preserve: boolean, walk: Walk, painted: boolean): void {
   for (const child of el.childNodes) {
     if (child.nodeType === 3 /* Node.TEXT_NODE */) {
+      if (!painted) continue
       const data = (child as Text).data
       for (let i = 0; i < data.length; i++) {
         if (!preserve && COLLAPSIBLE.test(data[i])) {
@@ -109,16 +135,26 @@ function walkRendered(el: Element, preserve: boolean, walk: Walk): void {
     const tag = childEl.tagName.toLowerCase()
     if (NON_RENDERED_TAGS.has(tag)) continue
     if (tag === 'br') {
-      walk.pendingEdge = true
+      if (!walk.verbatim && painted) walk.pendingEdge = true
       continue
     }
 
-    const style = window.getComputedStyle(childEl)
+    const style = styleOf(childEl)
     if (style.display === 'none') continue
 
-    const block = !isInlineBox(style.display)
+    // `visibility` is inherited, but a descendant is free to set it back to
+    // `visible` and be painted again — so a hidden element loses its own text
+    // while the walk keeps descending into its children.
+    const childPainted = painted && style.visibility !== 'hidden'
+
+    const block = !walk.verbatim && !isInlineBox(style.display)
     if (block) walk.pendingEdge = true
-    walkRendered(childEl, PRESERVING_WHITE_SPACE.has(style.whiteSpace), walk)
+    walkRendered(
+      childEl,
+      walk.verbatim || PRESERVING_WHITE_SPACE.has(style.whiteSpace),
+      walk,
+      childPainted,
+    )
     if (block) walk.pendingEdge = true
   }
 }
@@ -126,32 +162,33 @@ function walkRendered(el: Element, preserve: boolean, walk: Walk): void {
 /**
  * Build the flat text of `el` plus its per-character anchors.
  *
- * `'collapse'` reproduces what the browser paints: subtrees that render no
- * text are skipped, each element's own `white-space` decides whether its runs
- * fold, block edges and `<br>`s count as one space, and leading/trailing runs
- * disappear. `'preserve'` is the escape hatch — raw `textContent`, verbatim,
- * so an index into the string `el.textContent` hands you is the index the
- * directive uses.
+ * `'collapse'` reproduces what the browser paints: each element's own
+ * `white-space` decides whether its runs fold, block edges and `<br>`s count as
+ * one space, and leading/trailing runs disappear. `'preserve'` keeps every
+ * character as written and inserts no separators, so an index into the text of
+ * a `white-space: pre` host is the index the directive uses.
+ *
+ * Both modes skip the same things: non-rendered tags, `display: none`
+ * subtrees, and the text of a `visibility: hidden` element.
+ *
+ * The **host's own** visibility is deliberately not consulted. Pointing the
+ * directive at a hidden element is a request about that element, and it gets a
+ * diagnostic (`warnIfNotRendered`) rather than silence — the same treatment
+ * `display: none` on the host has always had. It is only *incidental* content
+ * inside the host that is excluded from the text.
  */
 export function buildTextMap(el: HTMLElement, whitespace: SelectTextWhitespace): TextMap {
+  const verbatim = whitespace === 'preserve'
   const walk: Walk = {
     chars: [],
     anchors: [],
     pending: null,
     pendingEdge: false,
     last: { node: el, offset: 0 },
+    verbatim,
   }
 
-  if (whitespace === 'preserve') {
-    const treeWalker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null)
-    let node = treeWalker.nextNode() as Text | null
-    while (node) {
-      for (let i = 0; i < node.data.length; i++) emit(walk, node.data[i], node, i)
-      node = treeWalker.nextNode() as Text | null
-    }
-  } else {
-    walkRendered(el, PRESERVING_WHITE_SPACE.has(window.getComputedStyle(el).whiteSpace), walk)
-  }
+  walkRendered(el, verbatim || PRESERVING_WHITE_SPACE.has(styleOf(el).whiteSpace), walk, true)
 
   // A trailing separator renders as nothing, so `last` is already the right end.
   walk.anchors.push(walk.last)
