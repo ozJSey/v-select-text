@@ -32,9 +32,12 @@ vSelectText.ts             entry — re-exports src/index
   `{ start: 0 }` — the same request — would report two different payloads: raw `textContent` from
   one, the resolved view from the other.
 - **`text-map.ts` is the only place that walks text nodes.** Offsets are expressed against the
-  text *as rendered* — hidden and non-rendered subtrees skipped, each element's own `white-space`
+  text *as rendered* — `display: none` and non-rendered subtrees skipped, a `visibility: hidden`
+  element's **own** text skipped while the walk keeps descending, each element's own `white-space`
   respected, block edges and `<br>`s counted as one space — and mapped back to `(textNode, offset)`
-  pairs there and nowhere else. This is what makes an ordinary `<p>` work: `textContent` is not
+  pairs there and nowhere else. "Hidden" is read per element from the computed value, never carried
+  down as a flag: `visibility` is inherited *and* overridable, so a `visible` descendant of a hidden
+  element is painted, and dropping it shifted every offset after it (fixed in 1.0.2). This is what makes an ordinary `<p>` work: `textContent` is not
   what the user sees, and the walk is what reconciles the two.
 - **`find-range.ts` never touches the DOM.** It answers `start`/`end`/`match` over a plain string,
   which is why the input path (`el.value`) and the Range path (flat subtree text) share one

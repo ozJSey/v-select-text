@@ -1,5 +1,68 @@
 # Changelog
 
+## 1.0.2
+
+Two defects, one of which hid the other. `vSelectText.audit.test.ts` — 43 tests written to pin an
+adversarial audit — was in **no** vitest project's `include` list, so it had never run once; asked
+for by name, the runner said so outright:
+
+```
+$ npx vitest run --config vitest.config.ts vSelectText.audit.test.ts
+filter:  vSelectText.audit.test.ts
+[vue-3.5] Config
+include: vSelectText.test.ts, vSelectText.text.test.ts, vSelectText.empty.test.ts, vSelectText.copy.test.ts, playground.smoke.test.ts
+...
+No test files found, exiting with code 1
+```
+
+Wired into both jsdom rungs, two of its tests were red against 1.0.1. One was a real defect in the
+text map; the other was a wrong test. Both are below. The suite is now 746 tests (43 of them the
+audit spec, on each Vue rung) and green.
+
+### Fixed
+
+- **A `visibility: visible` descendant of a `visibility: hidden` element was dropped from the text
+  map, shifting every later offset.** `visibility` is inherited *and* overridable — a child that
+  sets it back to `visible` is painted by every browser — but `text-map.ts` carried the parent's
+  paintedness down as a flag and ANDed it, so once a subtree went hidden nothing inside it could
+  come back. The text the directive reported, and the text it actually selected, both lost it.
+
+  Measured in headless Chrome against the built `dist/`, same page both times
+  (`<p><span style="visibility:hidden">GHOST<em style="visibility:visible">SEEN</em></span>tail</p>`,
+  bare `v-select-text`):
+
+  ```
+  1.0.1   { "chromeSaysEmIsPainted": "visible", "emPaintedRect": true,
+            "reportedText": "tail",     "documentSelection": "tail" }
+  1.0.2   { "chromeSaysEmIsPainted": "visible", "emPaintedRect": true,
+            "reportedText": "SEENtail", "documentSelection": "SEENtail" }
+  ```
+
+  Chrome paints `SEEN`; 1.0.1 selected around it. With `copy: true` that put the wrong substring on
+  the clipboard, and `{ start: 0, end: 4 }` on such a host selected four characters counted from
+  the wrong place. The flag is now read per element from the computed value, which already carries
+  the inheritance; the parent's state is consulted only when the engine declines to answer at all
+  (`computed-style.ts`).
+
+- **`vitest.workspace.ts` silently dropped a spec file.** Every jsdom spec in the directory is now
+  listed on both rungs, and the file says that this is the invariant rather than leaving it to be
+  noticed. Nothing in a plain `npm test` distinguishes "43 tests passed" from "43 tests were never
+  collected".
+
+### Tests
+
+- **`audit 3: does not throw out of a raw click listener` asserted a warning that could never
+  fire.** It passed `{ trigger: 'click', match: 0 }` as an *unreadable* match, but `0` is a finite
+  number and `resolve.ts` reads a number as its string form — a contract the two tests directly
+  above it (`match: 4821`, `match: 4821n`) pin, and that the warning's own advice text states. The
+  test could only ever have been red, and was, the moment the file was allowed to run. The source is
+  correct and is unchanged; the test now uses `match: {}`, which is genuinely unreadable, so it
+  exercises the path its name describes. Negative control: deleting the `unreadableWarned`
+  once-guard in `element-kind.ts` turns it red (`expected [ …(2) ] to have a length of 1 but got 2`),
+  which the `match: 0` version never would have.
+- Added `audit 3: reads 0 as its string form too`, pinning the falsy-number branch the old test had
+  mistaken for unreadable — the one number a `if (!raw)` shortcut would silently reclassify.
+
 ## 1.0.1
 
 A one-line `package.json` fix, and the line was a false statement about which Vue versions this

@@ -6,16 +6,28 @@ import { fileURLToPath } from 'node:url'
  *
  *   - `vue-3.5` / `vue-floor-3.2.0` — `vSelectText.test.ts`,
  *     `vSelectText.text.test.ts`, `vSelectText.empty.test.ts`,
- *     `vSelectText.copy.test.ts` and `playground.smoke.test.ts` run against
+ *     `vSelectText.copy.test.ts`, `vSelectText.audit.test.ts` and
+ *     `playground.smoke.test.ts` run against
  *     both ends of the declared peer range: the default `^3.5.0` and the
  *     aliased `vue_floor`, pinned to the exact floor `vue@3.2.0`. The alias is
  *     pinned, not a caret: `^3.2.0` resolves to 3.5.x on a fresh install, which
  *     would make the low rung a copy of the high one.
  *
+ *     **Every jsdom spec in this directory is listed above, and that is the
+ *     invariant.** A file left out does not run, and nothing says so: `npm test`
+ *     reports a green suite over whatever it happens to include, and vitest only
+ *     admits the gap if you ask it for that file by name
+ *     (`No test files found, exiting with code 1`). `vSelectText.audit.test.ts`
+ *     was in neither list from the day it was written — 43 tests, never once
+ *     executed, two of them red against the source they were written to pin, and
+ *     1.0.1 shipped past both. Adding a spec file means adding it here, to both
+ *     rungs, in the same commit.
+ *
  *     What this pair proves: the source RUNS on the floor. `useSelectText`
  *     calls `getCurrentScope()` / `onScopeDispose()`, so the rung reddens on
- *     anything older — measured, not assumed: aliased to 3.1.5 it fails 22 of
- *     its 325 tests (5/84 test, 2/29 empty, 10/67 copy, 5/127 text): 17 on
+ *     anything older — measured, not assumed, over the five files the rung held
+ *     at the time (325 tests, before the audit spec joined it): aliased to 3.1.5
+ *     it fails 22 of those 325 (5/84 test, 2/29 empty, 10/67 copy, 5/127 text): 17 on
  *     `TypeError: getCurrentScope is not a function`, 4 on `effectScope` (the
  *     test files import it; 3.2.0 introduced that too), 1 on an assertion that
  *     expected no throw.
@@ -42,6 +54,7 @@ export default defineWorkspace([
         'vSelectText.text.test.ts',
         'vSelectText.empty.test.ts',
         'vSelectText.copy.test.ts',
+        'vSelectText.audit.test.ts',
         'playground.smoke.test.ts',
       ],
     },
@@ -60,6 +73,7 @@ export default defineWorkspace([
         'vSelectText.text.test.ts',
         'vSelectText.empty.test.ts',
         'vSelectText.copy.test.ts',
+        'vSelectText.audit.test.ts',
         'playground.smoke.test.ts',
       ],
     },

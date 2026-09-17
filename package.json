@@ -1,6 +1,6 @@
 {
   "name": "@ozjsey/v-select-text",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Vue 3 directive for reactive text selection — select the rendered text of any element by range or pattern, optionally copying it, plus inputs, textareas and contenteditable",
   "author": "Ozgur Seyidoglu",
   "license": "MIT",

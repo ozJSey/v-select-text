@@ -145,7 +145,15 @@ function walkRendered(el: Element, preserve: boolean, walk: Walk, painted: boole
     // `visibility` is inherited, but a descendant is free to set it back to
     // `visible` and be painted again — so a hidden element loses its own text
     // while the walk keeps descending into its children.
-    const childPainted = painted && style.visibility !== 'hidden'
+    //
+    // The computed value already carries the inheritance, so it is read fresh
+    // per element rather than ANDed with the parent's. ANDing made `hidden`
+    // sticky: `<span hidden><em visible>SEEN</em></span>tail` painted "SEEN" on
+    // screen while the map held only "tail", so every offset after it was short
+    // by four and `{ start: 0 }` copied text that did not match the highlight.
+    // `''` is `computed-style.ts` reporting that the engine would not answer;
+    // the inherited state is the only thing left to go on.
+    const childPainted = style.visibility === '' ? painted : style.visibility !== 'hidden'
 
     const block = !walk.verbatim && !isInlineBox(style.display)
     if (block) walk.pendingEdge = true

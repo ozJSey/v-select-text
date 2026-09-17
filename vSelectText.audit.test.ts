@@ -347,9 +347,24 @@ describe('audit 3: an unreadable match does not throw', () => {
     expect(detail!.text).toBe('4821')
   })
 
+  it('reads 0 as its string form too — a falsy number is still a needle', () => {
+    // Pinned separately because `0` is the one number a `if (!raw)` shortcut
+    // would silently reclassify as unreadable. It is not: `readMatch` asks
+    // `Number.isFinite`, and the warning's own advice says a number is read as
+    // its string form. This test replaces the `match: 0` that the click test
+    // below used to pass as an *unreadable* value — it was readable all along,
+    // so that assertion could only ever have been red.
+    const el = host('order 0 shipped')
+    let detail: SelectTextEventDetail | null = null
+    el.addEventListener('select-text', (e) => (detail = (e as CustomEvent).detail))
+    mount(el, { match: 0 } as unknown as SelectTextOptions)
+    expect(detail!.text).toBe('0')
+    expect(warn).not.toHaveBeenCalled()
+  })
+
   it('does not throw out of a raw click listener, where Vue cannot catch it', () => {
     const el = host('sk-live-9f3b2c7d41ae', 'code')
-    mount(el, { trigger: 'click', match: 0 } as unknown as SelectTextOptions)
+    mount(el, { trigger: 'click', match: {} } as unknown as SelectTextOptions)
     expect(() => el.click()).not.toThrow()
     expect(() => el.click()).not.toThrow()
     // …and it says so exactly once, not once per click.

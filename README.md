@@ -296,6 +296,9 @@ So by default (`whitespace: 'collapse'`) the directive walks the subtree once an
 
 - Every run of ASCII whitespace (space, tab, newline, form feed, carriage return) counts as a single space, and leading/trailing runs are dropped.
 - Subtrees that paint no text are skipped: `display: none` (which is what `v-show="false"` sets), and the contents of `<script>`, `<style>`, `<noscript>`, `<template>`, `<textarea>`, `<select>`, `<option>`, `<title>`, `<iframe>`, `<object>`, `<canvas>`, `<audio>` and `<video>`. A `match` can never reach into text the user cannot see.
+- The text of a `visibility: hidden` element is skipped too — but only its own. `visibility` is
+  inherited and a descendant may set it back to `visible`, which the browser paints; that text is
+  counted, because dropping it would shift every offset after it past what the reader sees.
 - Each element's own `white-space` is respected, so a `<pre>` nested inside a normal-flow host keeps its runs while its siblings collapse.
 - A block-level child boundary and a `<br>` each count as one space, so `<ul><li>a</li><li>b</li></ul>` reads as `"a b"` rather than `"ab"` and `match: 'a b'` can find it.
 
