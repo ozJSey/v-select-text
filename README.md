@@ -35,7 +35,7 @@ Selecting an `<input>` is one line of vanilla JS (`el.select()`) and needs no di
 npm install @ozjsey/v-select-text
 ```
 
-Vue 3 is a peer dependency — it won't be bundled.
+Vue 3 is a peer dependency — it won't be bundled. **Vue 3.2.0 or newer is required**: `useSelectText` calls `getCurrentScope()` / `onScopeDispose()`, which Vue 3.2.0 added and 3.1.x does not export.
 
 ## Usage
 

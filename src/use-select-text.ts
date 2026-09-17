@@ -204,6 +204,9 @@ export function useSelectText(params: UseSelectTextParams): UseSelectTextReturn 
   // `onScopeDispose` warns when there's no active scope (eg. plain script
   // contexts, SSR boot). Gate via `getCurrentScope()` so the composable is
   // usable outside `setup()` / `effectScope.run()` without spam.
+  // Both landed in Vue 3.2.0 — checked against the published packages, not the
+  // docs: 3.1.5 exports neither — and that is what sets this package's peer
+  // floor at `^3.2.0`.
   if (getCurrentScope()) {
     onScopeDispose(() => {
       retireInFlight()

@@ -1,7 +1,7 @@
 {
   "name": "@ozjsey/v-select-text",
-  "version": "1.0.0",
-  "description": "Vue 3 directive for reactive text selection \u2014 select the rendered text of any element by range or pattern, optionally copying it, plus inputs, textareas and contenteditable",
+  "version": "1.0.1",
+  "description": "Vue 3 directive for reactive text selection — select the rendered text of any element by range or pattern, optionally copying it, plus inputs, textareas and contenteditable",
   "author": "Ozgur Seyidoglu",
   "license": "MIT",
   "repository": {
@@ -54,7 +54,7 @@
     "copy"
   ],
   "peerDependencies": {
-    "vue": "^3.0.0"
+    "vue": "^3.2.0"
   },
   "devDependencies": {
     "jsdom": "^25.0.0",
@@ -62,7 +62,7 @@
     "typescript": "^5.5.0",
     "vitest": "^2.0.0",
     "vue": "^3.5.0",
-    "vue3_3": "npm:vue@^3.3.13"
+    "vue_floor": "npm:vue@3.2.0"
   },
   "publishConfig": {
     "access": "public"
