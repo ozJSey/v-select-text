@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.3 — 2026-09-18
+
+Documentation only; no code change. The README is cut to a landing page — problem, solution,
+install, a couple of usage examples — because the playground now carries the reference: every
+option driven in a real browser rather than described in a table. Claims that could not be
+verified against the source were deleted rather than carried across.
+
 ## 1.0.2
 
 Two defects, one of which hid the other. `vSelectText.audit.test.ts` — 43 tests written to pin an
