@@ -2,7 +2,10 @@
 
 Select the rendered text of any element — whole, by range, or by pattern.
 
-[![npm](https://img.shields.io/npm/v/@ozjsey/v-select-text)](https://www.npmjs.com/package/@ozjsey/v-select-text)
+[![npm](https://img.shields.io/npm/v/@ozjsey/v-select-text.svg)](https://www.npmjs.com/package/@ozjsey/v-select-text)
+![license MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+![gzipped 5.13 KiB](https://img.shields.io/badge/gzipped-5.13%20KiB-blue.svg)
+![dependencies 0](https://img.shields.io/badge/dependencies-0-blue.svg)
 
 **[See it running, and edit it in the browser →](https://ozjsey.github.io/npm-portfolio-playground/#v-select-text)**
 
